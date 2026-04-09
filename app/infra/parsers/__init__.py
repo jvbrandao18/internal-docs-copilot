@@ -1,1 +1,1 @@
-"""Document parsers."""
+"""Document parser implementations."""

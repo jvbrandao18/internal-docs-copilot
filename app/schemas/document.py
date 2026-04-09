@@ -1,35 +1,47 @@
 from datetime import datetime
-from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class DocumentResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
-
-    id: str
-    filename: str
-    content_type: str
-    file_extension: str
-    status: str
-    chunk_count: int
-    metadata: dict[str, Any] = Field(alias="document_metadata")
-    error_message: str | None = None
-    created_at: datetime
-    updated_at: datetime
-    deleted_at: datetime | None = None
+from pydantic import BaseModel, ConfigDict
 
 
 class DocumentUploadResponse(BaseModel):
-    document: DocumentResponse
-    audit_event_id: str
+    document_id: str
+    status: str
+
+
+class DocumentListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    filename: str
+    file_type: str
+    status: str
+    uploaded_at: datetime
+    processed_at: datetime | None = None
+    page_count: int | None = None
+    sheet_count: int | None = None
+    error_message: str | None = None
+
+
+class DocumentListResponse(BaseModel):
+    items: list[DocumentListItem]
+
+
+class DocumentDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    filename: str
+    file_type: str
+    status: str
+    path: str
+    sha256_hash: str
+    uploaded_at: datetime
+    processed_at: datetime | None = None
+    page_count: int | None = None
+    sheet_count: int | None = None
+    error_message: str | None = None
 
 
 class DocumentDeleteResponse(BaseModel):
     document_id: str
     status: str
-    audit_event_id: str
-
-
-class DocumentListResponse(BaseModel):
-    items: list[DocumentResponse]

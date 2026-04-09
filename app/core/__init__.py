@@ -1,1 +1,1 @@
-"""Application core utilities."""
+"""Core configuration, logging and exceptions."""

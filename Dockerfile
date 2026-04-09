@@ -12,15 +12,10 @@ RUN apt-get update \
 
 COPY pyproject.toml README.md ./
 COPY app ./app
+COPY data ./data
 
 RUN pip install --upgrade pip \
     && pip install .
-
-RUN mkdir -p /app/data/uploads /app/data/chroma \
-    && useradd --create-home appuser \
-    && chown -R appuser:appuser /app
-
-USER appuser
 
 EXPOSE 8000
 

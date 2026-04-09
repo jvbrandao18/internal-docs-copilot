@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends
 
-from app.api.dependencies import get_container
-from app.core.container import AppContainer
+from app.api.dependencies import get_settings
+from app.core.config import Settings
 
-router = APIRouter(prefix="/health", tags=["health"])
+router = APIRouter(tags=["health"])
 
 
-@router.get("")
-def healthcheck(container: AppContainer = Depends(get_container)) -> dict[str, object]:
-    return container.healthcheck()
+@router.get("/health")
+def healthcheck(settings: Settings = Depends(get_settings)) -> dict[str, str]:
+    return {"status": "ok", "service": settings.app_name}

@@ -3,7 +3,11 @@ class AppError(Exception):
     code = "app_error"
 
     def __init__(
-        self, message: str, *, status_code: int | None = None, code: str | None = None
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        code: str | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -29,5 +33,10 @@ class ConfigurationError(AppError):
 
 
 class ExternalServiceError(AppError):
-    status_code = 503
+    status_code = 502
     code = "external_service_error"
+
+
+class ValidationError(AppError):
+    status_code = 422
+    code = "validation_error"
