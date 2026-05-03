@@ -1,100 +1,50 @@
-# internal-docs-copilot
+# Internal Docs Copilot
 
-Backend API-first para consulta auditável de documentos corporativos com RAG sobre arquivos `PDF`, `XLSX` e `CSV`.
+Internal Docs Copilot is a FastAPI backend that ingests internal documents, indexes their content, and answers questions with retrieved sources, excerpts, confidence, and audit data.
 
-## Visão geral
+## What is it?
 
-Este projeto demonstra como construir um copilot interno simples, explícito e confiável para responder perguntas sobre documentos empresariais. A proposta não é criar um chatbot genérico: a API só deve responder quando houver evidência recuperada da base indexada.
+It is an API-first RAG backend for querying local `PDF`, `XLSX`, and `CSV` documents.
 
-O fluxo do MVP é direto:
+The API can:
 
-1. receber um arquivo;
-2. extrair conteúdo e metadados;
-3. gerar chunks;
-4. criar embeddings;
-5. indexar vetores no ChromaDB;
-6. recuperar contexto relevante para uma pergunta;
-7. responder com fontes, trechos, confiança e trilha de auditoria.
+- upload documents
+- parse document content and metadata
+- split content into chunks
+- create embeddings
+- index chunks in ChromaDB
+- answer questions using retrieved evidence
+- list query audit history
+- reject answers when there is not enough evidence
 
-Quando a evidência é insuficiente, a aplicação recusa a resposta de forma previsível e segura.
+There is no UI in this MVP. The focus is the backend pipeline, retrieval flow, source attribution, and auditability.
 
-## Problema
+## Why was it built?
 
-Documentação interna costuma ficar espalhada entre PDFs, planilhas e exports CSV. Encontrar respostas rápidas exige leitura manual, contexto de negócio e, muitas vezes, confiança em respostas que não deixam claro de onde vieram.
+Internal documentation is often spread across PDFs, spreadsheets, and CSV exports. Finding an answer can require manual reading, business context, and trust in responses that may not clearly show their source.
 
-## Solução
+This project was built to demonstrate a simple and inspectable RAG backend. It avoids hiding the retrieval process behind a large orchestration framework and keeps the main responsibilities visible: parsing, chunking, embeddings, vector search, answer generation, source attribution, refusal behavior, persistence, and tests.
 
-O `internal-docs-copilot` organiza esse fluxo em uma API backend enxuta:
+## How does it work?
 
-- upload de documentos `PDF`, `XLSX` e `CSV`;
-- parsing com preservação de metadados de origem;
-- chunking apropriado para texto corrido e planilhas;
-- indexação vetorial com ChromaDB;
-- persistência relacional de documentos, chunks e auditoria em SQLite;
-- respostas baseadas apenas em contexto recuperado;
-- recusa segura quando não houver base documental suficiente.
+A client uploads a document to `/documents/upload`. The service stores the file locally, extracts text and metadata, creates chunks, persists document records in SQLite, and indexes embeddings in ChromaDB.
 
-## O que o projeto faz
+When a client sends a question to `/queries/ask`, the service embeds the question, retrieves relevant chunks, builds an answer from the recovered evidence, stores query/audit data, and returns:
 
-- expõe endpoints HTTP para ingestão, consulta e auditoria;
-- salva os arquivos enviados localmente em `data/uploads`;
-- registra metadados e histórico de consultas em SQLite;
-- indexa embeddings em `data/chroma`;
-- retorna resposta, confiança, fontes, trechos, quantidade de chunks recuperados e latência;
-- mantém logging estruturado em JSON para facilitar observabilidade local e futura evolução.
+- `answer`
+- `confidence`
+- `sources`
+- `retrieved_chunks`
+- `latency_ms`
 
-## Escopo do MVP
+If the retrieved evidence is insufficient, the application returns a controlled refusal instead of guessing.
 
-Dentro do MVP:
-
-- API sem interface gráfica;
-- upload, listagem, inspeção e remoção de documentos;
-- suporte a `PDF`, `XLSX` e `CSV`;
-- endpoint de perguntas com contexto recuperado;
-- auditoria de consultas;
-- recusa segura sem evidência.
-
-Fora do MVP:
-
-- autenticação;
-- UI;
-- OCR;
-- multiusuário;
-- reranker;
-- workers assíncronos.
-
-## Arquitetura
-
-O projeto segue uma estrutura em camadas, com responsabilidade explícita por pasta:
-
-- `app/api`: rotas FastAPI e dependências;
-- `app/core`: configuração, exceções e logging estruturado;
-- `app/database`: base SQLAlchemy, sessão e modelos ORM;
-- `app/repositories`: acesso ao SQLite;
-- `app/services`: ingestão, parsing, chunking, retrieval, answer e auditoria;
-- `app/infra/parsers`: implementação de leitura para `PDF`, `XLSX` e `CSV`;
-- `app/infra/llm`: clientes da OpenAI para embeddings e resposta;
-- `app/infra/vectorstore`: integração com ChromaDB;
-- `app/schemas`: contratos de entrada e saída da API.
-
-Essa separação deixa o pipeline de RAG entendível e auditável, sem depender de frameworks de orquestração como LangChain ou LlamaIndex.
-
-## Fluxo de RAG
-
-1. `POST /documents/upload` salva o arquivo e registra o documento.
-2. O parser converte o arquivo em registros com metadados.
-3. O chunking transforma o conteúdo em unidades recuperáveis.
-4. Os chunks são persistidos no SQLite e indexados no ChromaDB.
-5. `POST /queries/ask` gera embedding da pergunta e busca os chunks mais relevantes.
-6. O serviço de resposta monta o contexto e força uma resposta baseada apenas na evidência recuperada.
-7. O resultado final e os eventos relacionados ficam disponíveis na trilha de auditoria.
-
-## Stack
+### Main technologies
 
 - Python 3.12
 - FastAPI
-- Uvicorn
-- Pydantic v2
+- Pydantic
+- Pydantic Settings
 - SQLAlchemy
 - SQLite
 - PyMuPDF
@@ -102,19 +52,81 @@ Essa separação deixa o pipeline de RAG entendível e auditável, sem depender 
 - openpyxl
 - ChromaDB
 - OpenAI API
-- pytest
+- Pytest
 - Ruff
 - Black
-- Docker
-- docker-compose
+- Docker Compose
 
-## Como rodar
+### API endpoints
 
-### 1. Configuração
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Health check |
+| `POST` | `/documents/upload` | Upload and ingest a document |
+| `GET` | `/documents` | List ingested documents |
+| `GET` | `/documents/{document_id}` | Retrieve document details |
+| `DELETE` | `/documents/{document_id}` | Delete a document |
+| `POST` | `/queries/ask` | Ask a question using retrieved document context |
+| `GET` | `/audit/queries` | List query audit sessions |
+| `GET` | `/audit/queries/{query_id}` | Retrieve the audit trail for one query |
+| `GET` | `/docs` | Swagger API documentation |
 
-Para usar upload e query com a OpenAI, crie um `.env` a partir do `.env.example` e preencha `OPENAI_API_KEY`.
+### Example usage
 
-Variáveis principais:
+Health check:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Upload a document:
+
+```bash
+curl -X POST http://localhost:8000/documents/upload \
+  -F "file=@docs/policies.csv"
+```
+
+Ask a question:
+
+```bash
+curl -X POST http://localhost:8000/queries/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What is the password policy?",
+    "document_ids": [],
+    "top_k": 5
+  }'
+```
+
+### Project structure
+
+```text
+app/
+  main.py                 FastAPI application factory
+  api/                    Routes and dependencies
+  core/                   Configuration, exceptions, and logging
+  database/               SQLAlchemy base, session, and models
+  infra/llm/              OpenAI chat and embedding clients
+  infra/parsers/          PDF, XLSX, and CSV parsers
+  infra/vectorstore/      ChromaDB integration
+  repositories/           SQLite repositories
+  schemas/                Pydantic request and response schemas
+  services/               Ingestion, chunking, retrieval, answer, and audit logic
+tests/
+  integration/
+  unit/
+Dockerfile
+docker-compose.yml
+pyproject.toml
+```
+
+## How do I run it?
+
+### Configure environment
+
+Create a `.env` file from `.env.example` and set `OPENAI_API_KEY` before running document upload and question answering against real embeddings and chat completion.
+
+Important variables:
 
 - `APP_NAME`
 - `APP_ENV`
@@ -126,185 +138,50 @@ Variáveis principais:
 - `CHROMA_PERSIST_DIR`
 - `UPLOAD_DIR`
 - `LOG_LEVEL`
-
-### 2. Subir com Docker
-
-```bash
-docker-compose up --build
-```
-
-O `docker-compose.yml` já possui defaults para desenvolvimento local. Se existir um arquivo `.env`, o Docker Compose usa seus valores automaticamente.
-
-### 3. Rodar localmente sem Docker
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e .[dev]
-uvicorn app.main:app --reload
-```
-
-## Check mínimo depois do bootstrap
-
-Antes de fazer uma rodada maior de hardening, o fluxo básico precisa estar de pé:
-
-1. `GET /health`
-2. `POST /documents/upload`
-3. `GET /documents`
-
-Se quiser validar a pergunta ponta a ponta, configure uma `OPENAI_API_KEY` válida e teste também `POST /queries/ask`.
-
-## Endpoints
-
-- `GET /health`
-- `POST /documents/upload`
-- `GET /documents`
-- `GET /documents/{document_id}`
-- `DELETE /documents/{document_id}`
-- `POST /queries/ask`
-- `GET /audit/queries`
-- `GET /audit/queries/{query_id}`
-
-## Exemplo de uso
-
-### Health
-
-```bash
-curl http://localhost:8000/health
-```
-
-### Upload
-
-```bash
-curl -X POST http://localhost:8000/documents/upload ^
-  -F "file=@docs/policies.csv"
-```
-
-### Listagem
-
-```bash
-curl http://localhost:8000/documents
-```
-
-### Pergunta
-
-```bash
-curl -X POST http://localhost:8000/queries/ask ^
-  -H "Content-Type: application/json" ^
-  -d "{\"question\":\"What is the password policy?\",\"document_ids\":[],\"top_k\":5}"
-```
-
-## Testes e qualidade
-
-Executar a suíte:
-
-```bash
-python -m pytest
-```
-
-Executar lint:
-
-```bash
-python -m ruff check .
-python -m black --check .
-```
-
-## Limitações atuais
-
-- não há autenticação nem isolamento por usuário;
-- não há OCR para PDFs escaneados;
-- a qualidade da resposta depende da evidência recuperada;
-- não há reranker;
-- não há processamento assíncrono para arquivos grandes.
-
-## Roadmap
-
-- filtros mais fortes por documento e tipo de fonte;
-- melhores heurísticas de confiança;
-- suporte a mais formatos corporativos;
-- observabilidade mais rica para produção;
-- autenticação e controle de acesso em uma próxima etapa.
-
-## Por que este projeto demonstra AI Engineering
-
-Este repositório mostra competências práticas de engenharia para sistemas com IA aplicada:
-
-- pipeline de RAG manual e compreensível;
-- integração real com embeddings, vetor store e LLM;
-- recusa segura para reduzir hallucination;
-- rastreabilidade via auditoria e citações;
-- testes úteis em parser, chunking, upload e query flow;
-- arquitetura simples o suficiente para manutenção e explicação em entrevista.
-
-## Disclaimer
-
-Este é um projeto de portfólio. Não envie documentos sensíveis de produção sem revisar governança, retenção, controle de acesso, política de logs e requisitos legais do seu ambiente.
-3. Envie uma pergunta para `/api/v1/queries/ask`.
-4. Receba uma resposta com:
-   - texto final;
-   - score de confianca;
-   - citacoes;
-   - trechos usados como evidencia;
-   - indicacao de recusa quando faltar base documental.
-
-## Como rodar localmente
-
-```bash
-python -m venv .venv
-.venv\\Scripts\\activate
-pip install -e .[dev]
-copy .env.example .env
-uvicorn app.main:app --reload
-```
-
-Depois, acesse:
-
-- `http://127.0.0.1:8000/docs`
-- `http://127.0.0.1:8000/openapi.json`
-
-## Variaveis de ambiente
-
-O arquivo `.env.example` traz a configuracao inicial. As variaveis mais importantes sao:
-
-- `OPENAI_API_KEY`
-- `OPENAI_EMBEDDING_MODEL`
-- `OPENAI_CHAT_MODEL`
-- `SQLITE_DB_PATH`
-- `CHROMA_PATH`
-- `UPLOADS_DIR`
-- `CHUNK_SIZE`
-- `CHUNK_OVERLAP`
-- `TOP_K_RESULTS`
+- `PDF_CHUNK_SIZE`
+- `PDF_CHUNK_OVERLAP`
+- `DEFAULT_TOP_K`
 - `MIN_EVIDENCE_SCORE`
 
-## Desenvolvimento
-
-### Testes
+### Run with Docker Compose
 
 ```bash
-pytest
-```
-
-### Qualidade de codigo
-
-```bash
-ruff check .
-black --check .
-```
-
-## Docker
-
-```bash
-copy .env.example .env
 docker compose up --build
 ```
 
-## Estado atual
+The API will be available at:
 
-Este repositorio ja contem o bootstrap funcional do backend com:
+```text
+http://localhost:8000
+```
 
-- estrutura de aplicacao organizada;
-- endpoints principais do MVP;
-- integracao com SQLite, ChromaDB e OpenAI;
-- testes unitarios para parsers e chunking;
-- configuracao de lint, formatacao e containerizacao.
+### Run locally
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .[dev]
+uvicorn app.main:app --reload
+```
+
+On Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e .[dev]
+uvicorn app.main:app --reload
+```
+
+Open:
+
+- Swagger docs: `http://127.0.0.1:8000/docs`
+- OpenAPI schema: `http://127.0.0.1:8000/openapi.json`
+
+### Tests and validation
+
+```bash
+python -m pytest
+python -m ruff check .
+python -m black --check .
+```
